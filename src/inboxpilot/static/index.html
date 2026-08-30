@@ -20,7 +20,10 @@
     button:disabled { cursor: not-allowed; opacity: .58; }
     .primary { background: var(--accent); color: white; }
     .primary:hover { background: var(--accent-dark); }
-    .status { min-height: 28px; color: var(--muted); font: 14px system-ui, sans-serif; }
+    .status { position: sticky; top: 0; z-index: 10; min-height: 40px; padding: 10px 12px; color: var(--muted); background: rgba(245, 242, 234, .96); border-bottom: 1px solid var(--line); font: 14px system-ui, sans-serif; }
+    .card-status { display: none; margin: 0 0 16px; padding: 10px 12px; border: 1px solid var(--line); background: #fffdf8; color: var(--muted); font: 14px/1.4 system-ui, sans-serif; }
+    .card-status.visible { display: block; }
+    .card-status.error { color: #8b2f1f; border-color: #d7a498; background: #fff3ef; }
     .memory-panel { margin-top: 44px; padding-top: 24px; border-top: 1px solid var(--line); }
     .memory-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
     .memory-header h2 { margin: 0; font-size: 25px; }
@@ -45,7 +48,6 @@
     .artifact { white-space: pre-wrap; padding: 16px; margin: 0 0 26px; border-left: 3px solid var(--accent); background: #f1eee5; font-size: 15px; }
     .editor { display: grid; gap: 12px; margin: 0 0 22px; }
     .reply-editor { display: grid; gap: 10px; }
-    .reply-editor .primary { justify-self: start; }
     .editor label { color: var(--muted); font: 700 11px system-ui, sans-serif; letter-spacing: 1px; text-transform: uppercase; }
     textarea { width: 100%; min-height: 130px; resize: vertical; padding: 12px; border: 1px solid var(--line); border-radius: 3px; background: #fffdf8; color: var(--ink); font: 15px/1.5 Georgia, serif; }
     .feedback { min-height: 72px; }
@@ -108,7 +110,11 @@
       card.className = 'review visible';
       const email = data.email || {};
       const decision = data.review_status && data.review_status.decision;
-      card.innerHTML = `<div class="context"><div class="eyebrow"></div><h2></h2><div class="meta"></div><div class="email-body"><span class="email-body-label">Original email</span><div class="email-body-content"></div></div><div class="reason"><strong>💡 Why the agent chose this</strong><div class="reasoning"></div></div></div><div class="decision"><p class="question"></p><div class="artifact"></div><div class="editor"><div class="reply-editor"><label>✍️ Edited reply<textarea class="edited-reply"></textarea></label><button class="primary reply-approve" data-decision="approve">✅ Approve and send</button></div><label>🗣️ Feedback and preferences<textarea class="feedback" placeholder="Tell the agent what to change now and what to remember, for example:&#10;Never include my phone number in replies.&#10;Prefer Saturday evenings for weekend meetings."></textarea></label><p class="feedback-note">Revise applies this feedback to the current proposal and saves durable preferences. Approve sends your edited reply exactly as shown and saves durable preferences without regenerating it.</p></div><div class="actions"><button class="primary action-approve" data-decision="approve">✅ Approve action</button><button class="primary" data-decision="revise">✨ Revise with feedback</button><button class="reject" data-decision="reject">❌ Reject</button></div></div>`;
+      card.innerHTML = `<div class="context"><div class="eyebrow"></div><h2></h2><div class="meta"></div><div class="email-body"><span class="email-body-label">Original email</span><div class="email-body-content"></div></div><div class="reason"><strong>💡 Why the agent chose this</strong><div class="reasoning"></div></div></div><div class="decision"><p class="question"></p><div class="artifact"></div><div class="editor"><div class="reply-editor"><label>✍️ Edited reply<textarea class="edited-reply"></textarea></label></div><label>🗣️ Feedback and preferences<textarea class="feedback" placeholder="Tell the agent what to change now and what to remember, for example:&#10;Never include my phone number in replies.&#10;Prefer Saturday evenings for weekend meetings."></textarea></label><p class="feedback-note">Revise applies this feedback to the current proposal and saves durable preferences. Approve sends your edited reply exactly as shown and saves durable preferences without regenerating it.</p><button class="primary" data-decision="revise">✨ Revise with feedback</button></div><div class="actions"><button class="reject" data-decision="reject">❌ Reject</button><button class="primary action-approve" data-decision="approve">✅ Approve and send</button></div></div>`;
+      const cardStatus = document.createElement('div');
+      cardStatus.className = 'card-status';
+      cardStatus.setAttribute('role', 'status');
+      card.querySelector('.decision').prepend(cardStatus);
       card.querySelector('.eyebrow').textContent = (data.intent || 'unknown').replace('_', ' ');
       card.querySelector('h2').textContent = email.subject || 'No subject';
       card.querySelector('.meta').textContent = email.from || 'Unknown sender';
@@ -121,27 +127,19 @@
       const editor = card.querySelector('.editor');
       const editedReply = card.querySelector('.edited-reply');
       const reviseButton = card.querySelector('[data-decision="revise"]');
-      const replyApproveButton = card.querySelector('.reply-approve');
       const actionApproveButton = card.querySelector('.action-approve');
       if (data.status === 'pending' && ['respond', 'respond_and_block_calendar'].includes(data.intent)) {
         editedReply.value = data.draft_reply || '';
-        actionApproveButton.style.display = 'none';
+        actionApproveButton.textContent = '✅ Approve and send';
       } else if (data.status === 'pending' && data.intent === 'block_calendar') {
         card.querySelector('.reply-editor').style.display = 'none';
         actionApproveButton.textContent = '✅ Approve action';
       } else {
         editor.style.display = 'none';
         reviseButton.style.display = 'none';
-        replyApproveButton.style.display = 'none';
       }
       if (data.status === 'complete') {
-        card.querySelector('[data-decision="reject"]').style.display = 'none';
-        if (decision === 'approve') {
-          actionApproveButton.textContent = data.intent === 'block_calendar' ? '✅ Action completed' : '✅ Sent';
-          actionApproveButton.disabled = true;
-        } else {
-          card.querySelector('.actions').style.display = 'none';
-        }
+        card.querySelector('.actions').style.display = 'none';
       }
       if (data.status === 'pending') card.dataset.reviewId = data.review_id;
       return card;
@@ -164,20 +162,41 @@
       const reviewId = button.closest('.review').dataset.reviewId;
       status.textContent = 'Recording your decision...';
       const card = button.closest('.review');
+      const cardStatus = card.querySelector('.card-status');
+      const subject = card.querySelector('h2').textContent;
       const payload = { decision: button.dataset.decision };
       if (button.dataset.decision === 'revise' || button.dataset.decision === 'approve') {
         payload.edited_reply = card.querySelector('.edited-reply').value;
         payload.feedback = card.querySelector('.feedback').value;
       }
       card.querySelectorAll('button').forEach(action => { action.disabled = true; });
+      const approvedCardPlaceholder = payload.decision === 'approve' ? document.createComment('approved review') : null;
+      if (approvedCardPlaceholder) {
+        card.replaceWith(approvedCardPlaceholder);
+        status.textContent = `Sending "${subject}"...`;
+      }
       try {
         const response = await fetch(`/api/review/${encodeURIComponent(reviewId)}/decision`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
         const data = await response.json();
         if (!response.ok) throw new Error(data.detail || 'The review action failed.');
-        card.replaceWith(createReviewCard(data));
-        status.textContent = payload.decision === 'revise' ? 'The proposal was revised and is ready for review.' : `Decision recorded: ${payload.decision}.`;
+        if (payload.decision === 'approve') {
+          approvedCardPlaceholder.remove();
+          const remaining = reviews.querySelectorAll('.review[data-review-id]').length;
+          status.textContent = data.intent === 'block_calendar'
+            ? `Addressed "${subject}": calendar action completed. ${remaining} review(s) remaining.`
+            : `Addressed "${subject}": reply sent. ${remaining} review(s) remaining.`;
+        } else {
+          card.replaceWith(createReviewCard(data));
+          status.textContent = payload.decision === 'revise' ? 'The proposal was revised and is ready for review.' : `Decision recorded: ${payload.decision}.`;
+        }
       } catch (error) {
-        status.textContent = `Could not complete the review: ${error.message}`;
+        if (approvedCardPlaceholder && approvedCardPlaceholder.isConnected) {
+          approvedCardPlaceholder.replaceWith(card);
+        }
+        const errorMessage = `Could not complete "${subject}": ${error.message}`;
+        status.textContent = errorMessage;
+        cardStatus.textContent = errorMessage;
+        cardStatus.className = 'card-status visible error';
         card.querySelectorAll('button').forEach(action => { action.disabled = false; });
       }
     });

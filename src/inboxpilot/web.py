@@ -72,7 +72,10 @@ def serialize_result(result: dict[str, Any]) -> dict[str, Any]:
 
 @app.get("/", response_class=FileResponse)
 def index() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+    return FileResponse(
+        STATIC_DIR / "index.html",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
+    )
 
 
 @app.get("/api/config")
@@ -132,9 +135,18 @@ def load_latest_review(
     except Exception as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
 
-    if not results:
+    reviews = [serialize_result(result) for result in results]
+    reviews = [
+        review
+        for review in reviews
+        if not (
+            review["status"] == "complete"
+            and (review.get("review_status") or {}).get("decision") in {"approve", "reject"}
+        )
+    ]
+    if not reviews:
         return {"status": "empty", "message": "No matching Primary email was found."}
-    return {"status": "batch", "count": len(results), "reviews": [serialize_result(result) for result in results]}
+    return {"status": "batch", "count": len(reviews), "reviews": reviews}
 
 
 @app.post("/api/review/{review_id}/decision")

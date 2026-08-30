@@ -13,6 +13,77 @@ It is designed to:
 
 Build a production-ready personal email agent that can act as an assistant for inbox triage, drafting, scheduling, and memory-aware follow-up without repeating the same preferences each time.
 
+For a presentation-ready explanation of the architecture, workflow, design decisions, and live demo, see [Architecture and application walkthrough](docs/architecture-and-app-walkthrough.md).
+
+## System architecture
+
+```mermaid
+flowchart TB
+    USER[User]
+
+    subgraph PRESENTATION[Presentation layer]
+        UI[Review Center<br/>HTML, CSS, JavaScript]
+        API[FastAPI application<br/>Review and integration endpoints]
+    end
+
+    subgraph ORCHESTRATION[Agent orchestration]
+        GRAPH[InboxPilot LangGraph agent]
+        TRIAGE[Triage and routing]
+        DRAFT[Reply and calendar proposal generation]
+        HITL[Human-review checkpoint<br/>Pause and resume]
+        PREF[Feedback preference classifier]
+    end
+
+    subgraph INTELLIGENCE[Model layer]
+        LLM[Nebius-hosted LLM<br/>OpenAI-compatible API]
+    end
+
+    subgraph MEMORY[Memory layer]
+        MEMCLIENT[InboxPilot memory adapter]
+        MEM0[Mem0 API<br/>Durable user preferences]
+        FALLBACK[Process-local fallback<br/>Development only]
+    end
+
+    subgraph GOOGLE[Google integrations]
+        GMAILCLIENT[Gmail client]
+        GMAILAPI[Google Gmail API]
+        CALCLIENT[Calendar client]
+        CALAPI[Google Calendar API]
+    end
+
+    USER -->|Inspect, edit, revise, approve| UI
+    UI <-->|HTTP and JSON| API
+    API --> GRAPH
+
+    GRAPH --> TRIAGE
+    TRIAGE --> DRAFT
+    DRAFT --> HITL
+    HITL -->|Pending review| API
+    API -->|Approved decision| HITL
+
+    TRIAGE --> LLM
+    DRAFT --> LLM
+    PREF --> LLM
+
+    GRAPH -->|Retrieve relevant preferences| MEMCLIENT
+    HITL -->|Feedback| PREF
+    PREF -->|Store classified preferences| MEMCLIENT
+    MEMCLIENT -->|Primary durable store| MEM0
+    MEMCLIENT -.->|Fallback when unavailable| FALLBACK
+
+    GRAPH -->|Read inbox| GMAILCLIENT
+    API -->|Send approved reply| GMAILCLIENT
+    GMAILCLIENT <--> GMAILAPI
+
+    GRAPH -->|Check availability| CALCLIENT
+    API -->|Create approved event| CALCLIENT
+    CALCLIENT <--> CALAPI
+```
+
+The FastAPI application is the boundary between the browser and the agent. LangGraph owns triage, drafting, memory-aware revision, and the human-review checkpoint. Mem0 is the primary durable preference store: the agent retrieves relevant user preferences before triage and drafting, while feedback is classified and saved as separate response, calendar, or triage memories. A process-local memory store is used only as a development fallback when Mem0 is unavailable.
+
+External changes remain behind explicit approval: the Gmail client sends the approved reply, and the Calendar client creates the approved event only after the graph resumes with an approval decision. The decision-flow diagram below is separate from this system-level view.
+
 ## Development decisions
 
 ### Triage uses structured output
@@ -98,7 +169,7 @@ Mem0 stores durable, user-scoped preferences learned from Review Center feedback
 
 ```json
 {
-  "user_id": "sneha.joseph89@gmail.com",
+  "user_id": "user@example.com",
   "memory": "Keep replies warm and concise.",
   "metadata": {
     "category": "response",
