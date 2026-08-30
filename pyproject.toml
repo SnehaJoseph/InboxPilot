@@ -1,0 +1,39 @@
+[project]
+name = "inboxpilot"
+version = "0.1.0"
+description = "Ambient Gmail assistant with LangGraph, Mem0, and Nebius support"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+authors = [{ name = "Your Name" }]
+license = { text = "MIT" }
+dependencies = [
+  "langchain>=1.0.0",
+  "langchain-core>=1.0.0",
+  "langchain-openai>=1.0.0",
+  "langgraph>=1.0.0",
+  "python-dotenv>=1.0.0",
+  "google-api-python-client>=2.128.0",
+  "google-auth-oauthlib>=1.0.0",
+  "google-auth-httplib2>=0.4.0",
+  "mem0ai>=0.1.0",
+  "pydantic>=2.0.0",
+  "fastapi>=0.115.0",
+  "uvicorn>=0.30.0",
+  "pytest>=8.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "ruff>=0.6.0",
+  "mypy>=1.11.0",
+]
+
+[build-system]
+requires = ["setuptools>=73.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
